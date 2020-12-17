@@ -1,16 +1,15 @@
 ﻿using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
-using UnityEngine.UIElements;
+using Mirror;
 
 [RequireComponent(typeof(CharacterController))]
-public class PlayerController : MonoBehaviour
+public class PlayerController : NetworkBehaviour
 {
-    [SerializeField] float speed = 3, runMult = 4, lookSensitivity = 5, jumpForce = 100, camClampValue = 80, health = 100f, armour = 100f;
+    [SerializeField] float speed = 3, runMult = 4, lookSensitivity = 5, jumpForce = 100, camClampValue = 80, health = 100f, armour = 0f;
     [SerializeField] Animator animController;
-    [SerializeField] Transform camBoom, cam;
+    [SerializeField] public Transform camBoom, cam;
     [SerializeField] RectTransform crosshair;
-    [SerializeField] Sprite img_crosshair, img_crosshairEx;
     public LayerMask mask;
     [SerializeField] Transform sphereCastStart;
     float anim_speed = 0, anim_walkDir = 0;
@@ -23,26 +22,44 @@ public class PlayerController : MonoBehaviour
     public bool canShoot = true;
     public BuildController build;
     TextMeshProUGUI armourText, healthText;
-    [SerializeField] UnityEngine.UI.Slider healthSlider, armourSlider;
-    CharacterController charController;
+    [SerializeField] Slider healthSlider, armourSlider;
+    [SerializeField] CharacterController charController;
     Vector3 gravVel = Vector3.zero;
     RaycastHit groundHit;
 
     private void Start()
     {
+        if (!isLocalPlayer)
+        {
+            return;
+        }
+        armourSlider = GameObject.Find("armourSlider").GetComponent<Slider>();
+        healthSlider = GameObject.Find("healthSlider").GetComponent<Slider>();
+        healthText = healthSlider.GetComponentInChildren<TextMeshProUGUI>();
+        armourText = armourSlider.GetComponentInChildren<TextMeshProUGUI>();
+        crosshair = GameObject.Find("crosshair").GetComponent<RectTransform>();
         UnityEngine.Cursor.visible = false;
         UnityEngine.Cursor.lockState = CursorLockMode.Locked;
         //rb = GetComponent<Rigidbody>();
         animController.SetFloat("speed", 0);
         animController.SetFloat("walkDir", 0);
         build = GetComponent<BuildController>();
-        healthText = healthSlider.GetComponentInChildren<TextMeshProUGUI>();
-        armourText = armourSlider.GetComponentInChildren<TextMeshProUGUI>();
         charController = GetComponent<CharacterController>();
     }
 
     private void Update()
     {
+        if (health <= 0)
+        {
+            Die();
+            Destroy(gameObject);
+        }
+
+        if (!isLocalPlayer)
+        {
+            return;
+        }
+
         healthSlider.value = health;
         armourSlider.value = armour;
 
@@ -51,7 +68,7 @@ public class PlayerController : MonoBehaviour
 
         //grounded = Physics.BoxCast(new Vector3(transform.position.x, transform.position.y + 2f, transform.position.z), Vector3.one / 8, -transform.up, Quaternion.Euler(Vector3.zero), 1.5f, mask);
         //grounded = charController.isGrounded;
-        grounded = Physics.Raycast(new Vector3(transform.position.x, transform.position.y + 0.5f, transform.position.z), -transform.up, 0.69f);
+        grounded = Physics.Raycast(new Vector3(transform.position.x, transform.position.y + 0.5f, transform.position.z), -transform.up, 0.75f, mask);
         Move();
         Look();
 
@@ -72,29 +89,56 @@ public class PlayerController : MonoBehaviour
         {
             if (!Physics.Raycast(new Vector3(transform.position.x, transform.position.y + 0.5f, transform.position.z), -transform.up, 0.95f))
                 animController.SetBool("jump", true);
+            else
+                animController.SetBool("jump", false);
         }
 
         crosshair.sizeDelta = new Vector2(size, size);
+
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            Cursor.visible = !Cursor.visible;
+            if (Cursor.visible == false)
+                Cursor.lockState = CursorLockMode.Locked;
+            else
+                Cursor.lockState = CursorLockMode.None;
+        }
+    }
+
+    void Die()
+    {
+        Destroy(gameObject);
     }
 
     private void FixedUpdate()
     {
-        grounded = Physics.Raycast(new Vector3(transform.position.x, transform.position.y + 0.5f, transform.position.z), -transform.up, 0.69f);
+        if (!isLocalPlayer)
+        {
+            return;
+        }
+
+        Gravity();
+    }
+
+    void Gravity()
+    {
+
+        grounded = Physics.Raycast(new Vector3(transform.position.x, transform.position.y + 0.5f, transform.position.z), -transform.up, 0.78f, mask);
 
         if (grounded)
         {
-            gravVel = new Vector3(0, -0.01f, 0);
+            gravVel = new Vector3(0, 0f, 0);
         }
         else
         {
-            if (Physics.Raycast(transform.position, transform.forward, out groundHit, 1f))
-                gravVel = new Vector3((groundHit.normal.x + .5f) * Time.fixedDeltaTime, (Physics.gravity.y * Time.fixedDeltaTime / 50) + gravVel.y, (groundHit.normal.z + .5f) * Time.fixedDeltaTime);
+            if (Physics.Raycast(transform.position, transform.forward, out groundHit, 0.6f, mask))
+                gravVel = new Vector3(((groundHit.normal.x) * Time.fixedDeltaTime / 2) + gravVel.x, (Physics.gravity.y * Time.fixedDeltaTime / 60) + gravVel.y, ((groundHit.normal.z) * Time.fixedDeltaTime / 2) + gravVel.z);
             else
             {
-                if (Physics.Raycast(transform.position, -transform.forward, out groundHit, 1f))
-                    gravVel = new Vector3((groundHit.normal.x + .5f) * Time.fixedDeltaTime, (Physics.gravity.y * Time.fixedDeltaTime / 50) + gravVel.y, (groundHit.normal.z + .5f) * Time.fixedDeltaTime);
+                if (Physics.Raycast(transform.position, -transform.forward, out groundHit, .6f, mask))
+                    gravVel = new Vector3(((groundHit.normal.x) * Time.fixedDeltaTime / 2) + gravVel.x, (Physics.gravity.y * Time.fixedDeltaTime / 60) + gravVel.y, ((groundHit.normal.z) * Time.fixedDeltaTime / 2) + gravVel.z);
                 else
-                    gravVel = new Vector3(0, (Physics.gravity.y * Time.fixedDeltaTime / 50) + gravVel.y, 0);
+                    gravVel = new Vector3(0, (Physics.gravity.y * Time.fixedDeltaTime / 60) + gravVel.y, 0);
             }
 
         }
@@ -123,6 +167,10 @@ public class PlayerController : MonoBehaviour
 
     private void Move()
     {
+        if (!isLocalPlayer)
+        {
+            return;
+        }
         float _x = Input.GetAxis("Horizontal");
         float _z = Input.GetAxis("Vertical");
 
@@ -180,6 +228,10 @@ public class PlayerController : MonoBehaviour
 
     private void Look()
     {
+        if (!isLocalPlayer)
+        {
+            return;
+        }
         float _yRot = Input.GetAxis("Mouse X");
         float _xRot = Input.GetAxis("Mouse Y");
 
@@ -191,6 +243,10 @@ public class PlayerController : MonoBehaviour
 
     private void Jump()
     {
+        if (!isLocalPlayer)
+        {
+            return;
+        }
         animController.SetBool("jump", true);
         //rb.AddRelativeForce(new Vector3(0, jumpForce, 0), ForceMode.VelocityChange);
         gravVel = new Vector3(0, jumpForce, 0);
@@ -199,6 +255,10 @@ public class PlayerController : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
+        if (!isLocalPlayer)
+        {
+            return;
+        }
         Pickup pickup = collision.gameObject.GetComponent<Pickup>();
 
         if (pickup != null)
@@ -212,6 +272,25 @@ public class PlayerController : MonoBehaviour
                 default:
                     break;
             }
+        }
+    }
+
+    [Command(ignoreAuthority = true)]
+    public void CmdDamage(float amount)
+    {
+        RpcDamage(amount);
+    }
+
+    [ClientRpc]
+    void RpcDamage(float amount)
+    {
+        if (armour == 0)
+        {
+            health -= amount;
+        }
+        else
+        {
+            armour -= amount;
         }
     }
 }

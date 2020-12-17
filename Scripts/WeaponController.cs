@@ -3,17 +3,21 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine.UI;
 using UnityEngine;
+using Mirror;
 
-public class WeaponController : MonoBehaviour
+public class WeaponController : NetworkBehaviour
 {
     int currentWeaponIndex = 0;
     public WeaponStat currentWeaponStats;
-    [SerializeField] RectTransform weaponDisplay_P;
+    RectTransform weaponDisplay_P;
     Image[] weaponDisplays = new Image[5];
     PlayerController player;
+    GameObject axe;
 
     void Start()
     {
+        weaponDisplay_P = GameObject.Find("gotten weapons").GetComponent<RectTransform>();
+
         for (int i = 0; i < 5; i++)
         {
             weaponDisplays[i] = weaponDisplay_P.GetChild(i).GetComponent<Image>();
@@ -21,59 +25,76 @@ public class WeaponController : MonoBehaviour
 
         player = GetComponentInParent<PlayerController>();
 
-        SwitchWeapon();
+        CmdSwitchWeapon();
     }
 
     void Update()
     {
-        if (Input.GetAxis("Mouse ScrollWheel") > 0f || Input.GetKeyDown(KeyCode.E) && !player.build.isBuilding)
+        if (Input.GetKeyDown(KeyCode.E) && !player.build.isBuilding)
         {
-            if (currentWeaponIndex >= transform.childCount - 1)
+            if (currentWeaponIndex >= transform.childCount - 2)
                 currentWeaponIndex = 0;
             else
                 currentWeaponIndex++;
 
-            SwitchWeapon();
+            CmdSwitchWeapon();
         }
-        else if (Input.GetAxis("Mouse ScrollWheel") < 0f && !player.build.isBuilding)
+
+        if (Input.GetKeyDown(KeyCode.Q) && !player.build.isBuilding)
         {
-            if (currentWeaponIndex <= 0)
-                currentWeaponIndex = transform.childCount - 1;
-            else
-                currentWeaponIndex--;
-
-            SwitchWeapon();
+            currentWeaponIndex = -1;
         }
 
-        weaponDisplays[currentWeaponIndex].GetComponentInChildren<TextMeshProUGUI>().text = currentWeaponStats.ammo.ToString();
+        weaponDisplays[currentWeaponIndex+1].GetComponentInChildren<TextMeshProUGUI>().text = currentWeaponStats.ammo.ToString();
     }
 
-    void SwitchWeapon()
+    //[Command(ignoreAuthority = true)]
+    void CmdSwitchWeapon()
     {
-        int i = 0;
+        RpcSwitchWeapon();
+    }
+
+    //[ClientRpc]
+    void RpcSwitchWeapon()
+    {
+        int i = -1;
 
         foreach (Transform weapon in transform)
         {
             if (i == currentWeaponIndex)
             {
-                weapon.gameObject.SetActive(true);
-                currentWeaponStats = weapon.gameObject.GetComponent<WeaponStat>();
-                weaponDisplays[i].GetComponent<RectTransform>().localPosition = new Vector2(weaponDisplays[i].GetComponent<RectTransform>().localPosition.x, 7);
+                if (currentWeaponIndex != -1)
+                {
+                    weapon.gameObject.SetActive(true);
+                    currentWeaponStats = weapon.gameObject.GetComponent<WeaponStat>();
+                    weaponDisplays[i+1].GetComponent<RectTransform>().localPosition = new Vector2(weaponDisplays[i+1].GetComponent<RectTransform>().localPosition.x, 7);
+                }
+                else
+                {
+                    axe.SetActive(true);
+                }
             }
             else
             {
                 weapon.gameObject.SetActive(false);
-                weaponDisplays[i].GetComponent<RectTransform>().localPosition = new Vector2(weaponDisplays[i].GetComponent<RectTransform>().localPosition.x, 0);
             }
 
-            //if (weapon.GetComponent<WeaponStat>().Name != "Axe")
-            //{
-                weaponDisplays[i].gameObject.SetActive(true);
-                weaponDisplays[i].transform.GetChild(0).GetComponent<Image>().sprite = weapon.GetComponent<WeaponStat>().img;
-                //weaponDisplays[i].GetComponentInChildren<TextMeshProUGUI>().text = currentWeaponStats.ammo.ToString();
+            if (i != -1)
+            {
+                weaponDisplays[i+1].gameObject.SetActive(true);
+                weaponDisplays[i+1].transform.GetChild(0).GetComponent<Image>().sprite = weapon.GetComponent<WeaponStat>().img;
+                //weaponDisplays[i+1].GetComponentInChildren<TextMeshProUGUI>().text = currentWeaponStats.ammo.ToString();
+                if (i != currentWeaponIndex)
+                {
+                    weaponDisplays[i+1].GetComponent<RectTransform>().localPosition = new Vector2(weaponDisplays[i+1].GetComponent<RectTransform>().localPosition.x, 0);
+                }
+            }
+            else
+            {
 
-                i++;
-            //}
+            }
+
+            i++;
         }
 
     }

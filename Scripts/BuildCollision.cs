@@ -18,7 +18,7 @@ public class BuildCollision : MonoBehaviour
 
     void FixedUpdate()
     {
-        objs = Physics.OverlapBox(transform.position, transform.localScale/2, transform.rotation);
+        objs = Physics.OverlapBox(transform.position, transform.localScale/2*1.1f, transform.rotation);
 
         isGrounded = false;
         isAttached = true;

@@ -6,7 +6,9 @@ public class WeaponStat : MonoBehaviour
 {
     public int ROF;
     public float hitForce;
+    public float range;
     public float accuracy;
+    public float scopedAccuracyFactor;
     public float damage;
     public ParticleSystem muzzleFlash;
     public ParticleSystem bulletEffect;
